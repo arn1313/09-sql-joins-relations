@@ -4,9 +4,9 @@ const pg = require('pg');
 const fs = require('fs');
 const express = require('express');
 const bodyParser = require('body-parser');
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const app = express();
-const conString = 'postgres://localhost:5432/kilovolt';// DONE: Don't forget to set your own conString
+const conString = 'postgres://postgres:1234@localhost:5432/kilovolt';// DONE: Don't forget to set your own conString
 const client = new pg.Client(conString);
 client.connect();
 client.on('error', function(error) {
@@ -29,7 +29,7 @@ app.get('/articles', function(request, response) {
     FROM articles
     INNER JOIN  authors
     ON author.author_id=articles.author_id
-    ORDER BY author.author_id
+    ORDER BY author.author_id;
     `)
     .then(function(result) {
       response.send(result.rows);
@@ -41,11 +41,10 @@ app.get('/articles', function(request, response) {
 
 app.post('/articles', function(request, response) {
   client.query(
-      'INSERT INTO authors
-       VALUES(authors)
-       ON CONFLICT DO NOTHING',
+      `INSERT INTO authors
+       ON CONFLICT DO NOTHING;`,
         // TODO: Write a SQL query to insert a new author, ON CONFLICT DO NOTHING
-      [], // TODO: Add the author and "authorUrl" as data for the SQL query
+      [request.body.author, request.body.authorUrl], // TODO: Add the author and "authorUrl" as data for the SQL query
       function(err) {
         if (err) console.error(err)
         queryTwo() // This is our second query, to be executed when this first query is complete.
@@ -56,9 +55,8 @@ app.post('/articles', function(request, response) {
     client.query(
         `SELECT author_id
          FROM authors
-         WHERE
         `, // TODO: Write a SQL query to retrieve the author_id from the authors table for the new article
-        [], // TODO: Add the author name as data for the SQL query
+        [request.body.author], // TODO: Add the author name as data for the SQL query
         function(err, result) {
           if (err) console.error(err)
           queryThree(result.rows[0].author_id) // This is our third query, to be executed when the second is complete. We are also passing the author_id into our third query
@@ -68,8 +66,11 @@ app.post('/articles', function(request, response) {
 
     function queryThree(author_id) {
       client.query(
-        ``, // TODO: Write a SQL query to insert the new article using the author_id from our previous query
-        [], // TODO: Add the data from our new article, including the author_id, as data for the SQL query.
+        `INSERT INTO articles(article_id, author_id, title, category, "publishedOn", body)
+        SELECT author_id, $1, $2, $3, $4, $5, $6
+        FROM authors
+        WHERE //SOMETHING HAPPENS HERE//;`, // TODO: Write a SQL query to insert the new article using the author_id from our previous query
+        [request.body.article_id, request.body.author_id, request.body.title, request.body.category, request.body.publishedOn, request.body.body], // TODO: Add the data from our new article, including the author_id, as data for the SQL query.
         function(err) {
           if (err) console.error(err);
           response.send('insert complete');
@@ -83,16 +84,20 @@ app.post('/articles', function(request, response) {
     // an author_id property, so we can reference it from the request.body.
     // TODO: Add the required values from the request as data for the SQL query to interpolate
     client.query(
-      ``,
-      []
+      `UPDATE articles
+      SET author_id = request.body.author_id...
+      WHERE //condition//;`,
+      [request.body.author_id??]
     )
     .then(function() {
       // TODO: Write a SQL query to update an article record. Keep in mind that article records
       // now have an author_id, in addition to title, category, publishedOn, and body.
       // TODO: Add the required values from the request as data for the SQL query to interpolate
       client.query(
-        ``,
-        []
+        `UPDATE articles(article_id, author_id, title, category, "publishedOn", body)
+        SET article_id = request.body.article_id;
+        `,
+        [request.body.article_id??]
       )
     })
     .then(function() {
@@ -116,21 +121,21 @@ app.post('/articles', function(request, response) {
     });
   });
 
-  app.delete('/articles', function(request, response) {
-    client.query('DELETE FROM articles')
+app.delete('/articles', function(request, response) {
+  client.query('DELETE FROM articles')
     .then(function() {
       response.send('Delete complete');
     })
     .catch(function(err) {
       console.error(err)
     });
-  });
+});
 
-  loadDB();
+loadDB();
 
-  app.listen(PORT, function() {
-    console.log(`Server started on port ${PORT}!`);
-  });
+app.listen(PORT, function() {
+  console.log(`Server started on port ${PORT}!`);
+});
 
 
   //////// ** DATABASE LOADERS ** ////////
