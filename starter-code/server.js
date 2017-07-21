@@ -6,7 +6,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const PORT = process.env.PORT || 3001;
 const app = express();
-const conString = 'postgres://postgres:1234@localhost:5432/kilovolt';// DONE: Don't forget to set your own conString
+const conString = 'postgres://localhost:5432/kilovolt';// DONE: Don't forget to set your own conString
 const client = new pg.Client(conString);
 client.connect();
 client.on('error', function(error) {
@@ -28,8 +28,8 @@ app.get('/articles', function(request, response) {
     SELECT *
     FROM articles
     INNER JOIN  authors
-    ON author.author_id=articles.author_id
-    ORDER BY author.author_id;
+    ON authors.author_id=articles.author_id
+    ORDER BY authors.author_id;
     `)
     .then(function(result) {
       response.send(result.rows);
@@ -41,7 +41,8 @@ app.get('/articles', function(request, response) {
 
 app.post('/articles', function(request, response) {
   client.query(
-      `INSERT INTO authors
+      `INSERT INTO authors(author, "authorUrl")
+       VALUES ($1, $2)
        ON CONFLICT DO NOTHING;`,
         // TODO: Write a SQL query to insert a new author, ON CONFLICT DO NOTHING
       [request.body.author, request.body.authorUrl], // TODO: Add the author and "authorUrl" as data for the SQL query
@@ -55,6 +56,7 @@ app.post('/articles', function(request, response) {
     client.query(
         `SELECT author_id
          FROM authors
+         WHERE author=$1;
         `, // TODO: Write a SQL query to retrieve the author_id from the authors table for the new article
         [request.body.author], // TODO: Add the author name as data for the SQL query
         function(err, result) {
@@ -66,11 +68,10 @@ app.post('/articles', function(request, response) {
 
     function queryThree(author_id) {
       client.query(
-        `INSERT INTO articles(article_id, author_id, title, category, "publishedOn", body)
-        SELECT author_id, $1, $2, $3, $4, $5, $6
-        FROM authors
-        WHERE //SOMETHING HAPPENS HERE//;`, // TODO: Write a SQL query to insert the new article using the author_id from our previous query
-        [request.body.article_id, request.body.author_id, request.body.title, request.body.category, request.body.publishedOn, request.body.body], // TODO: Add the data from our new article, including the author_id, as data for the SQL query.
+        `INSERT INTO articles(author_id, title, category, "publishedOn", body)
+         VALUES ($1, $2, $3, $4, $5, $6);
+        `, // TODO: Write a SQL query to insert the new article using the author_id from our previous query
+        [author_id, request.body.title, request.body.category, request.body.publishedOn, request.body.body], // TODO: Add the data from our new article, including the author_id, as data for the SQL query.
         function(err) {
           if (err) console.error(err);
           response.send('insert complete');
@@ -84,20 +85,21 @@ app.post('/articles', function(request, response) {
     // an author_id property, so we can reference it from the request.body.
     // TODO: Add the required values from the request as data for the SQL query to interpolate
     client.query(
-      `UPDATE articles
-      SET author_id = request.body.author_id...
-      WHERE //condition//;`,
-      [request.body.author_id??]
+      `UPDATE author
+      SET author=$1, 'authorUrl'=$2
+      WHERE author_id=$3`,
+      [request.body.author, request.body.authorURl, request.body.author_id]
     )
     .then(function() {
       // TODO: Write a SQL query to update an article record. Keep in mind that article records
       // now have an author_id, in addition to title, category, publishedOn, and body.
       // TODO: Add the required values from the request as data for the SQL query to interpolate
       client.query(
-        `UPDATE articles(article_id, author_id, title, category, "publishedOn", body)
-        SET article_id = request.body.article_id;
+        `UPDATE articles
+        SET author_id=$1, title=$2, category=$3, 'publishedOn'=$4, body=$5
+        WHERE article_id=$6;
         `,
-        [request.body.article_id??]
+        [request.body.author_id, request.body.title, request.body.category, request.body.publishedOn, request.body.body, request.params.id]
       )
     })
     .then(function() {
